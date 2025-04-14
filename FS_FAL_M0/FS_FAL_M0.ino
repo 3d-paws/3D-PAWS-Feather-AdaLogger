@@ -5,6 +5,8 @@
  *   Description: 
  *   Author: Robert Bubon
  *   Date:   2023-03-02 RJB Initial, Based on SSG_FAL_MO
+ *           2025-04-14 RJB Moved Serial Console Pin to 12 from A4
+ *                          Added reading pressure on BMX init
  *                    
  * Adafruit Feather M0 Adalogger
  *   https://learn.adafruit.com/adafruit-feather-m0-adalogger/
@@ -19,10 +21,8 @@
  *   https://docs.google.com/document/d/175frIAoAJ5y6CAXXmnu5DXZdkZN9XwJHLCq7kx9fo1Q/edit
  * ======================================================================================================================
  */
-#define VERSION_INFO "FSFALMO-220302"
+#define VERSION_INFO "FSFALMO-250414"
 #define W4SC false   // Set true to Wait for Serial Console to be connected
-
-
 
 #include <SPI.h>
 #include <Wire.h>
@@ -91,7 +91,7 @@ int cf_raingauge_enabled = 0;
  *  Serial Console Enable
  * ======================================================================================================================
  */
-int  SCE_PIN = A4;
+int  SCE_PIN = 12;
 bool SerialConsoleEnabled = false;  // Variable for serial monitor control
 
 /*
@@ -1382,6 +1382,7 @@ void bmx_initialize() {
         BMX_1_exists = true;
         BMX_1_type = BMX_TYPE_BMP280;
         msgp = (char *) "BMP1 OK";
+        float p = bmp1.readPressure();
       }
     break;
 
@@ -1395,13 +1396,15 @@ void bmx_initialize() {
         else {
           BMX_1_exists = true;
           BMX_1_type = BMX_TYPE_BMP390;
-          msgp = (char *) "BMP390_1 OK";         
+          msgp = (char *) "BMP390_1 OK";
+          float p = bm31.readPressure();        
         }      
       }
       else {
         BMX_1_exists = true;
         BMX_1_type = BMX_TYPE_BME280;
         msgp = (char *) "BME280_1 OK";
+        float p = bme1.readPressure();
       }
     break;
 
@@ -1415,6 +1418,7 @@ void bmx_initialize() {
         BMX_1_exists = true;
         BMX_1_type = BMX_TYPE_BMP388;
         msgp = (char *) "BM31 OK";
+        float p = bm31.readPressure();
       }
     break;
 
@@ -1437,6 +1441,7 @@ void bmx_initialize() {
         BMX_2_exists = true;
         BMX_2_type = BMX_TYPE_BMP280;
         msgp = (char *) "BMP2 OK";
+        float p = bmp2.readPressure();
       }
     break;
 
@@ -1450,13 +1455,15 @@ void bmx_initialize() {
         else {
           BMX_2_exists = true;
           BMX_2_type = BMX_TYPE_BMP390;
-          msgp = (char *) "BMP390_2 OK";          
+          msgp = (char *) "BMP390_2 OK";
+          float p = bm32.readPressure();          
         }
       }
       else {
         BMX_2_exists = true;
         BMX_2_type = BMX_TYPE_BME280;
         msgp = (char *) "BME280_2 OK";
+        float p = bme2.readPressure();
       }
     break;
 
@@ -1470,6 +1477,7 @@ void bmx_initialize() {
         BMX_2_exists = true;
         BMX_2_type = BMX_TYPE_BMP388;
         msgp = (char *) "BM31 OK";
+        float p = bm32.readPressure();
       }
     break;
 
@@ -1854,8 +1862,6 @@ unsigned int s_gauge_median() {
   
   return (sg_buckets[i]); // Pins are 10bit resolution (0-1023)
 }
-
-
 
 /*
  * ======================================================================================================================
