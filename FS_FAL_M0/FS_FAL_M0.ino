@@ -7,6 +7,7 @@
  *   Date:   2023-03-02 RJB Initial, Based on SSG_FAL_MO
  *           2025-04-14 RJB Moved Serial Console Pin to 12 from A4
  *                          Added reading pressure on BMX init
+ *                          Wind Initialize now check cf_anemometer_enabled before initializing
  *                    
  * Adafruit Feather M0 Adalogger
  *   https://learn.adafruit.com/adafruit-feather-m0-adalogger/
@@ -2372,7 +2373,7 @@ void setup()
   hih8_initialize();
 
   // Skip Wind Init if RTC not valid so user can set RTC
-  if (RTC_valid) {
+  if (cf_anemometer_enabled && RTC_valid) {
     Wind_Initiailize();
   }
 }
