@@ -1155,9 +1155,11 @@ void Wind_GustUpdate() {
  * ======================================================================================================================
  */
 void Wind_TakeReading() {
-  wind.bucket[wind.bucket_idx].direction = (int) Wind_SampleDirection();
-  wind.bucket[wind.bucket_idx].speed = Wind_SampleSpeed();
-  wind.bucket_idx = (++wind.bucket_idx) % WIND_READINGS; // Advance bucket index for next reading
+  if (cf_anemometer_enable) {
+    wind.bucket[wind.bucket_idx].direction = (int) Wind_SampleDirection();
+    wind.bucket[wind.bucket_idx].speed = Wind_SampleSpeed();
+    wind.bucket_idx = (++wind.bucket_idx) % WIND_READINGS; // Advance bucket index for next reading
+  }
 }
 
 /* 
