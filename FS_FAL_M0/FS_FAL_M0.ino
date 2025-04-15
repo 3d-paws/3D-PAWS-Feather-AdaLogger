@@ -7,7 +7,10 @@
  *   Date:   2023-03-02 RJB Initial, Based on SSG_FAL_MO
  *           2025-04-14 RJB Moved Serial Console Pin to 12 from A4
  *                          Added reading pressure on BMX init
- *                          Wind Initialize now check cf_anemometer_enabled before initializing
+ *                          Wind Initialize now check cf_anemometer_enable before initializing
+ *           2025-04-15 RJB Moved Distance from A3 to A4
+ *                          Moved Rain from A1 to A3
+ *                          Added cf_ds_enable and code to support distance sensor on A4.
  *                    
  * Adafruit Feather M0 Adalogger
  *   https://learn.adafruit.com/adafruit-feather-m0-adalogger/
@@ -22,7 +25,7 @@
  *   https://docs.google.com/document/d/175frIAoAJ5y6CAXXmnu5DXZdkZN9XwJHLCq7kx9fo1Q/edit
  * ======================================================================================================================
  */
-#define VERSION_INFO "FSFALMO-250414"
+#define VERSION_INFO "FSFALMO-250415"
 #define W4SC false   // Set true to Wait for Serial Console to be connected
 
 #include <SPI.h>
@@ -84,9 +87,12 @@ char *msgp;                   // Pointer to message text
 char Buffer32Bytes[32];       // General storage
 int countdown = 30;  //1800       // Exit calibration mode when reaches 0 - protects against burnt out pin or forgotten jumper
 unsigned long lastOBS = 0;    // used to time next observation
-int cf_anemometer_enabled = 1;
-int cf_raingauge_enabled = 0;
 
+int cf_anemometer_enable = 1;
+int cf_raingauge_enable = 0;
+int cf_ds_enable = 0;    // Enable Distance sensor
+int cf_ds_type = 0;      // Distance sensor type 0 = 5m (default), 1 = 10m
+int cf_ds_baseline = 0;  // Distance sensor baseline. If positive, distance = baseline - ds_median
 /*
  * ======================================================================================================================
  *  Serial Console Enable
@@ -104,14 +110,25 @@ bool SerialConsoleEnabled = false;  // Variable for serial monitor control
 
 /*
  * =======================================================================================================================
- *  Stream / Snow Gauge
+ * Distance Sensor
+ * 
+ * The 5-meter sensors (MB7360, MB7369, MB7380, and MB7389) use a scale factor of (Vcc/5120) per 1-mm.
+ * Particle 12bit resolution (0-4095),  Sensor has a resolution of 0 - 5119mm,  Each unit of the 0-4095 resolution is 1.25mm
+ * Feather has 10bit resolution (0-1023), Sensor has a resolution of 0 - 5119mm, Each unit of the 0-1023 resolution is 5mm
+ * 
+ * The 10-meter sensors (MB7363, MB7366, MB7383, and MB7386) use a scale factor of (Vcc/10240) per 1-mm.
+ * Particle 12bit resolution (0-4095), Sensor has a resolution of 0 - 10239mm, Each unit of the 0-4095 resolution is 2.5mm
+ * Feather has 10bit resolution (0-1023), Sensor has a resolution of 0 - 10239mm, Each unit of the 0-1023 resolution is 10mm
+ * 
+ * The distance sensor will report as type sg  for Snow, Stream, or Surge gauge deployments.
+ * A Median value based on 60 samples 250ms apart is obtain. Then subtracted from ds_baseline for the observation.
  * =======================================================================================================================
  */
-#define SGAUGE_PIN       A3
-#define SG_BUCKETS       60
+#define DS_PIN     A4
+#define DS_BUCKETS 60
 
-unsigned int sg_bucket = 0;
-unsigned int sg_buckets[SG_BUCKETS];
+unsigned int ds_bucket = 0;
+unsigned int ds_buckets[DS_BUCKETS];
 
 /*
  * ======================================================================================================================
@@ -156,7 +173,7 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
  *  SD Card
  * ======================================================================================================================
  */
-#define SD_ChipSelect 4    // D4
+#define SD_ChipSelect 4     // D4
 // SD;                      // File system object defined by the SD.h include file.
 File SD_fp;
 char SD_obsdir[] = "/OBS";  // Store our obs in this directory. At Power on, it is created if does not exist
@@ -183,7 +200,7 @@ bool SD_exists = false;     // Set to true if SD card found at boot
  * ======================================================================================================================
  */
 #define ANEMOMETER_IRQ_PIN  A2
-#define RAINGAUGE_IRQ_PIN   A1 
+#define RAINGAUGE_IRQ_PIN   A3 
 #define WIND_READINGS       60       // One minute of 1s Samples
 
 typedef struct {
@@ -1844,24 +1861,29 @@ void I2C_Check_Sensors() {
 
 /* 
  *=======================================================================================================================
- * s_gauge_median()
+ * DS_Median()
  *=======================================================================================================================
  */
-unsigned int s_gauge_median() {
+float DS_Median() {
   int i;
 
-  for (i=0; i<SG_BUCKETS; i++) {
+  for (i=0; i<DS_BUCKETS; i++) {
     // delay(500);
     delay(250);
-    sg_buckets[i] = (int) analogRead(SGAUGE_PIN);
-    // sprintf (Buffer32Bytes, "SG[%02d]:%d", i, sg_buckets[i]);
+    ds_buckets[i] = (int) analogRead(DS_PIN);
+    // sprintf (Buffer32Bytes, "DS[%02d]:%d", i, ds_buckets[i]);
     // OutputNS (Buffer32Bytes);
   }
   
-  mysort(sg_buckets, SG_BUCKETS);
-  i = (SG_BUCKETS+1) / 2 - 1; // -1 as array indexing in C starts from 0
-  
-  return (sg_buckets[i]); // Pins are 10bit resolution (0-1023)
+  mysort(ds_buckets, DS_BUCKETS);
+  i = (DS_BUCKETS+1) / 2 - 1; // -1 as array indexing in C starts from 0
+
+  if (cf_ds_type) {  // 0 = 5m, 1 = 10m
+    return (ds_buckets[i]*10);
+  }
+  else {
+    return (ds_buckets[i]*5);
+  }
 }
 
 /*
@@ -1884,7 +1906,7 @@ void OBS_Do (bool log_obs) {
 
   sprintf (msgbuf, "{\"at\":\"%s\",", timestamp);
 
-  if (cf_raingauge_enabled) {
+  if (cf_raingauge_enable) {
     float rain = 0.0;
     unsigned long rgds;    // rain gauge delta seconds, seconds since last rain gauge observation logged
 
@@ -1897,7 +1919,7 @@ void OBS_Do (bool log_obs) {
     sprintf (msgbuf+strlen(msgbuf), "\"rg\":%u.%02d,", (int)rain, (int)(rain*100)%100);
   }
 
-  if (cf_anemometer_enabled) {
+  if (cf_anemometer_enable) {
     Wind_GustUpdate();                       // Update Gust and Gust Direction readings
     
     float ws = Wind_SpeedAverage();
@@ -1907,6 +1929,18 @@ void OBS_Do (bool log_obs) {
     
     sprintf (msgbuf+strlen(msgbuf), "\"ws\":%u.%02d,\"wd\":%d,\"wg\":%u.%02d,\"wgd\":%d,", 
       (int)ws, (int)(ws*100)%100, wd, (int)wg, (int)(wd*100)%100, wgd);
+  }
+
+  if (cf_ds_enable) {
+    float ds_median, ds_median_raw;
+
+    ds_median = ds_median_raw = DS_Median();
+    if (cf_ds_baseline > 0) {
+      ds_median = cf_ds_baseline - ds_median_raw;
+    }
+    sprintf (msgbuf+strlen(msgbuf), "\"ds\":%d.%02d,\"dsr\":%d.%02d,", 
+      (int)ds_median, (int)(ds_median*100)%100,
+      (int)ds_median_raw, (int)(ds_median_raw*100)%100);
   }
 
   //
@@ -2281,9 +2315,6 @@ void setup()
     SerialConsoleEnabled = true;
   }
 
-  // Set up gauge pin for reading 
-  pinMode(SGAUGE_PIN, INPUT);
-
   if (DisplayEnabled) {
     if (I2C_Device_Exist (OLED_I2C_ADDRESS)) {
       display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDRESS);
@@ -2347,7 +2378,7 @@ void setup()
   Output(msgbuf);
   delay (2000);
 
-  if (cf_raingauge_enabled) {
+  if (cf_raingauge_enable) {
     // Optipolar Hall Effect Sensor SS451A - Rain Gauge
     raingauge_interrupt_count = 0;
     raingauge_interrupt_stime = millis();
@@ -2356,12 +2387,18 @@ void setup()
     Output("RG:ENABLED");
   }
   
-  if (cf_anemometer_enabled) {
+  if (cf_anemometer_enable) {
     // Optipolar Hall Effect Sensor SS451A - Wind Speed
     anemometer_interrupt_count = 0;
     anemometer_interrupt_stime = millis();
     attachInterrupt(ANEMOMETER_IRQ_PIN, anemometer_interrupt_handler, FALLING);
     Output("WS:ENABLED");
+  }
+
+  // Set up distance sensor pin for reading
+  if (cf_ds_enable) {
+    pinMode(DS_PIN, INPUT);
+    Output("DS:ENABLED");
   }
 
   // I2C Sensor Init
@@ -2373,7 +2410,7 @@ void setup()
   hih8_initialize();
 
   // Skip Wind Init if RTC not valid so user can set RTC
-  if (cf_anemometer_enabled && RTC_valid) {
+  if (cf_anemometer_enable && RTC_valid) {
     Wind_Initiailize();
   }
 }
