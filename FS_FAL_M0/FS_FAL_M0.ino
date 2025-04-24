@@ -11,6 +11,7 @@
  *           2025-04-15 RJB Moved Distance from A3 to A4
  *                          Moved Rain from A1 to A3
  *                          Added cf_ds_enable and code to support distance sensor on A4.
+ *           2025-04-24 RJB Corrected bugs in negative temperature reporting
  *                    
  * Adafruit Feather M0 Adalogger
  *   https://learn.adafruit.com/adafruit-feather-m0-adalogger/
@@ -25,7 +26,7 @@
  *   https://docs.google.com/document/d/175frIAoAJ5y6CAXXmnu5DXZdkZN9XwJHLCq7kx9fo1Q/edit
  * ======================================================================================================================
  */
-#define VERSION_INFO "FSFALMO-250415"
+#define VERSION_INFO "FSFALMO-250424"
 #define W4SC false   // Set true to Wait for Serial Console to be connected
 
 #include <SPI.h>
@@ -1978,7 +1979,7 @@ void OBS_Do (bool log_obs) {
 
     sprintf (msgbuf+strlen(msgbuf), "\"bp1\":%u.%02d,\"bt1\":%d.%02d,\"bh1\":%d.%02d,",
       (int)p, (int)(p*100)%100,
-      (int)t, (int)(t*100)%100,
+      (int)t, abs((int)(t*100)%100),
       (int)h, (int)(h*100)%100);
   }
 
@@ -2012,7 +2013,7 @@ void OBS_Do (bool log_obs) {
 
     sprintf (msgbuf+strlen(msgbuf), "\"bp2\":%u.%02d,\"bt2\":%d.%02d,\"bh2\":%d.%02d,",
       (int)p, (int)(p*100)%100,
-      (int)t, (int)(t*100)%100,
+      (int)t, abs((int)(t*100)%100),
       (int)h, (int)(h*100)%100);
   }
 
@@ -2028,7 +2029,7 @@ void OBS_Do (bool log_obs) {
 
     sprintf (msgbuf+strlen(msgbuf), "\"hh1\":%u.%02d,\"ht1\":%d.%02d,",
       (int)h, (int)(h*100)%100,
-      (int)t, (int)(t*100)%100);
+      (int)t, abs((int)(t*100)%100));
   }
 
   if (SI1145_exists) {
@@ -2073,8 +2074,8 @@ void OBS_Do (bool log_obs) {
     t = mcp1.readTempC();
     t = (isnan(t)) ? -999.99 : t;
 
-    sprintf (msgbuf+strlen(msgbuf), "\"mt1\":%u.%02d,",
-      (int)t, (int)(t*100)%100);
+    sprintf (msgbuf+strlen(msgbuf), "\"mt1\":%d.%02d,",
+      (int)t, abs((int)(t*100)%100));
   }
 
   if (MCP_2_exists) {
@@ -2082,8 +2083,8 @@ void OBS_Do (bool log_obs) {
    
     t = mcp2.readTempC();
     t = (isnan(t)) ? -999.99 : t;
-    sprintf (msgbuf+strlen(msgbuf), "\"mt2\":%u.%02d,",
-      (int)t, (int)(t*100)%100);
+    sprintf (msgbuf+strlen(msgbuf), "\"mt2\":%d.%02d,",
+      (int)t, abs((int)(t*100)%100));
   }
 
   if (SHT_1_exists) {
@@ -2095,8 +2096,8 @@ void OBS_Do (bool log_obs) {
     h = sht1.readHumidity();
     h = (isnan(h)) ? 0.0 : h;
     
-    sprintf (msgbuf+strlen(msgbuf), "\"sht1\":%u.%02d,\"shh1\":%d.%02d,",
-      (int)t, (int)(t*100)%100,
+    sprintf (msgbuf+strlen(msgbuf), "\"sht1\":%d.%02d,\"shh1\":%d.%02d,",
+      (int)t, abs((int)(t*100)%100),
       (int)h, (int)(h*100)%100);
   }
 
@@ -2109,8 +2110,8 @@ void OBS_Do (bool log_obs) {
     h = sht2.readHumidity();
     h = (isnan(h)) ? 0.0 : h;
     
-    sprintf (msgbuf+strlen(msgbuf), "\"sht2\":%u.%02d,\"shh2\":%d.%02d,",
-      (int)t, (int)(t*100)%100,
+    sprintf (msgbuf+strlen(msgbuf), "\"sht2\":%d.%02d,\"shh2\":%d.%02d,",
+      (int)t, abs((int)(t*100)%100),
       (int)h, (int)(h*100)%100);
   }
 
@@ -2125,8 +2126,8 @@ void OBS_Do (bool log_obs) {
     t = (isnan(t)) ? -999.99 : t;
     h = (isnan(h)) ? 0.0 : h;
 
-    sprintf (msgbuf+strlen(msgbuf), "\"ht2\":%u.%02d,\"ht2\":%d.%02d,",
-      (int)t, (int)(t*100)%100,
+    sprintf (msgbuf+strlen(msgbuf), "\"ht2\":%d.%02d,\"ht2\":%d.%02d,",
+      (int)t, abs((int)(t*100)%100),
       (int)h, (int)(h*100)%100);
   }
 
