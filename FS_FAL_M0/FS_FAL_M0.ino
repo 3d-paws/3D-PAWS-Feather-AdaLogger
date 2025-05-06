@@ -12,6 +12,8 @@
  *                          Moved Rain from A1 to A3
  *                          Added cf_ds_enable and code to support distance sensor on A4.
  *           2025-04-24 RJB Corrected bugs in negative temperature reporting
+ *           2025-05-06 RJB Moved heartbeat from A6 to A1
+ *                          Moved OLED Reset from A5 to -1, Not in use
  *                    
  * Adafruit Feather M0 Adalogger
  *   https://learn.adafruit.com/adafruit-feather-m0-adalogger/
@@ -69,7 +71,7 @@
 
 #define LED_PIN                   LED_BUILTIN
 #define REBOOT_PIN                A0  // Connect to shoot thy self relay
-#define HEARTBEAT_PIN             A6  // Connect to PICAXE-8M PIN-C3
+#define HEARTBEAT_PIN             A1  // Connect to PICAXE-8M PIN-C3
 #define OBSERVATION_INTERVAL      60   // Seconds
 
 
@@ -163,7 +165,7 @@ bool DisplayEnabled = true;
 #endif
 
 char oled_lines[DISPLAY_LINES][23];
-#define OLED_RESET A5
+#define OLED_RESET -1 // -1 = Not in use
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Use Teensy SDIO
